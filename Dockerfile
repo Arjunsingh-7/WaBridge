@@ -3,10 +3,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY scripts ./scripts
-COPY src ./src
-COPY web ./web
-COPY build.mjs site.config.json ./
+COPY . .
 RUN npm run build
 
 # ---- runtime ----
