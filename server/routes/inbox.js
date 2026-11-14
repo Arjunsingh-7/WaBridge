@@ -62,16 +62,20 @@ r.get('/:id', (req, res) => {
 async function backfill(conv) {
   if (conv.backfilled || conv.session_id === META_SESSION) return;
   run('UPDATE conversations SET backfilled = 1 WHERE id = ?', conv.id);
+  const isExternalOpenwa = process.env.USE_EXTERNAL_OPENWA === 'true' || process.env.USE_EXTERNAL_OPENWA === '1';
+  if (!isExternalOpenwa) return; // Embedded Baileys stores messages directly in SQLite, no external backfill needed.
+
   let items = [];
   try {
     const out = await engine.storedMessages(conv.session_id, conv.chat_id, 50);
-    items = (out?.messages || []).map((m) => ({
-      waId: m.waMessageId || m.id,
-      direction: m.direction === 'outgoing' ? 'out' : 'in',
+    const list = Array.isArray(out) ? out : (out?.messages || []);
+    items = list.map((m) => ({
+      waId: m.waMessageId || m.waId || (m.fromMe !== undefined ? m.id : null),
+      direction: (m.fromMe || m.direction === 'outgoing' || m.direction === 'out') ? 'out' : 'in',
       type: m.type || 'text',
       body: m.body,
-      status: m.direction === 'outgoing' ? m.status || 'sent' : 'received',
-      createdAt: toIso(m.timestamp) || m.createdAt,
+      status: (m.fromMe || m.direction === 'outgoing' || m.direction === 'out') ? (m.status || 'sent') : 'received',
+      createdAt: toIso(m.timestamp) || m.createdAt || m.created_at,
     }));
   } catch {
     /* engine store may be empty */
@@ -81,11 +85,11 @@ async function backfill(conv) {
       const hist = await engine.history(conv.session_id, conv.chat_id, 40);
       items = (hist || []).map((m) => ({
         waId: m.id,
-        direction: m.fromMe ? 'out' : 'in',
+        direction: (m.fromMe || m.direction === 'outgoing' || m.direction === 'out') ? 'out' : 'in',
         type: m.type || 'text',
         body: m.body,
-        status: m.fromMe ? 'sent' : 'received',
-        createdAt: toIso(m.timestamp),
+        status: (m.fromMe || m.direction === 'outgoing' || m.direction === 'out') ? 'sent' : 'received',
+        createdAt: toIso(m.timestamp) || m.created_at,
       }));
     } catch {
       /* live history is whatsapp-web.js only */
