@@ -5,7 +5,7 @@
   "description": "WaBridge \u2014 WhatsApp workspace (inbox, campaigns, automations, AI) on top of the embedded Baileys engine",
   "type": "module",
   "engines": {
-    "node": ">=22.19"
+    "node": ">=22.5.0"
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",

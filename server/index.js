@@ -101,6 +101,18 @@ if (process.env.VERCEL !== '1') {
     logActivity('system.start', 'WaBridge started');
     startMonitor();
     startCampaignRunner();
+
+    // Anti-sleep pinger for Render / free tier hosts
+    const keepAliveUrl = process.env.RENDER_EXTERNAL_URL || process.env.KEEP_ALIVE_URL;
+    if (keepAliveUrl) {
+      const pingTarget = keepAliveUrl.replace(/\/+$/, '') + '/healthz';
+      console.log(`  keep-alive: auto-pinging ${pingTarget} every 10 minutes to prevent sleep`);
+      setInterval(async () => {
+        try {
+          await fetch(pingTarget);
+        } catch {}
+      }, 10 * 60 * 1000).unref();
+    }
   });
 }
 
