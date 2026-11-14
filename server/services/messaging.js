@@ -68,6 +68,23 @@ export function recordMessage(conv, m) {
     const dup = get('SELECT id FROM messages WHERE conversation_id = ? AND wa_id = ?', conv.id, m.waId);
     if (dup) return null;
   }
+  if (m.direction === 'out' && m.body) {
+    const pendingDup = get(
+      `SELECT id FROM messages
+       WHERE conversation_id = ? AND direction = 'out' AND body = ? AND (wa_id IS NULL OR wa_id = ?)
+         AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 seconds')
+       ORDER BY id DESC LIMIT 1`,
+      conv.id,
+      m.body,
+      m.waId || '',
+    );
+    if (pendingDup) {
+      if (m.waId) {
+        run('UPDATE messages SET wa_id = ?, status = ? WHERE id = ?', m.waId, m.status || 'sent', pendingDup.id);
+      }
+      return get('SELECT * FROM messages WHERE id = ?', pendingDup.id);
+    }
+  }
   const info = run(
     `INSERT INTO messages(conversation_id, wa_id, direction, type, body, media_name, media_path, media_mime, status, error, author, created_at)
      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

@@ -207,8 +207,11 @@ async function processInboundMessage(sock, sessionId, msg) {
   const remoteJid = msg.key.remoteJid || '';
   if (remoteJid.endsWith('@broadcast') || remoteJid.endsWith('@newsletter')) return;
 
-  const fromMe = Boolean(msg.key.fromMe);
+  const sessionObj = activeSessions.get(sessionId);
+  const myPhone = sessionObj?.phone || (sock?.user?.id ? sock.user.id.split(':')[0].split('@')[0] : null);
   const chatId = cleanChatId(remoteJid);
+  const isSelfChat = Boolean(myPhone && (chatId === `${myPhone}@s.whatsapp.net` || phoneFromChatId(chatId) === myPhone));
+  const fromMe = Boolean(msg.key.fromMe) || isSelfChat;
   const isGroup = isGroupChat(chatId) || chatId.endsWith('@g.us');
   const senderJid = msg.key.participant || (fromMe ? sock?.user?.id : remoteJid) || remoteJid;
   const senderPhone = senderJid ? senderJid.split(':')[0].split('@')[0] : null;
