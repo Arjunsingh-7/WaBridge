@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   Download,
   Smartphone,
+  Trash2,
 } from 'lucide-react';
 import { api, fileToBase64, mediaKindFor } from '../lib/api.js';
 import { useLive, useToast, useAuth } from '../lib/app.jsx';
@@ -49,7 +50,7 @@ function Tick({ status }) {
   return <Check className="size-3.5 opacity-80" />;
 }
 
-function MessageBubble({ m, isGroup }) {
+function MessageBubble({ m, isGroup, onDelete }) {
   const out = m.direction === 'out';
   const isImage = m.media_path && (m.type === 'image' || m.type === 'sticker' || String(m.media_mime).startsWith('image/'));
   const isVideo = m.media_path && (m.type === 'video' || String(m.media_mime).startsWith('video/'));
@@ -66,6 +67,16 @@ function MessageBubble({ m, isGroup }) {
           m.status === 'failed' && 'from-rose-600 to-rose-700',
         )}
       >
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(m.id)}
+            className="absolute -top-2 -right-2 hidden size-5 items-center justify-center rounded-full bg-slate-800/90 text-white shadow hover:bg-rose-600 group-hover:flex"
+            title="Delete this message"
+          >
+            <X className="size-3" />
+          </button>
+        )}
         {!out && isGroup && m.author && <p className="mb-0.5 text-xs font-bold text-brand-600 dark:text-brand-300">{m.author}</p>}
         {out && AUTHOR_LABEL[m.author] && (
           <p className="mb-0.5 flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-white/70">
@@ -179,7 +190,7 @@ function NewChatModal({ open, onClose, numbers, onStarted }) {
   );
 }
 
-function DetailsPanel({ conv, users, onChange, onClose }) {
+function DetailsPanel({ conv, users, onChange, onClose, onClearMessages, onDeleteConversation }) {
   const [data, setData] = useState(null);
   const [note, setNote] = useState('');
   const [tags, setTags] = useState('');
@@ -249,6 +260,30 @@ function DetailsPanel({ conv, users, onChange, onClose }) {
               </li>
             ))}
           </ul>
+        </div>
+        <div className="border-t border-slate-100 pt-5 dark:border-ink-800">
+          <p className="label flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+            <Trash2 className="size-3.5" /> Manage chat
+          </p>
+          <div className="mt-3 space-y-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="w-full justify-center text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+              icon={Trash2}
+              onClick={onClearMessages}
+            >
+              Clear chat history
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-full justify-center text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
+              onClick={onDeleteConversation}
+            >
+              Delete conversation
+            </Button>
+          </div>
         </div>
       </div>
     </aside>
@@ -416,6 +451,44 @@ export default function Inbox() {
     }
   };
 
+  const deleteMessage = async (msgId) => {
+    if (!window.confirm('Delete this message from chat history?')) return;
+    try {
+      await api.delete(`/api/conversations/${activeId}/messages/${msgId}`);
+      setMsgs((prev) => prev.filter((m) => m.id !== msgId));
+      toast('Message deleted');
+      loadList();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
+
+  const clearMessages = async () => {
+    if (!activeId) return;
+    if (!window.confirm('Are you sure you want to delete all messages in this chat history? This cannot be undone.')) return;
+    try {
+      await api.delete(`/api/conversations/${activeId}/messages`);
+      setMsgs([]);
+      toast('Chat history cleared');
+      loadList();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
+
+  const deleteConversation = async () => {
+    if (!activeId) return;
+    if (!window.confirm('Are you sure you want to permanently delete this entire conversation?')) return;
+    try {
+      await api.delete(`/api/conversations/${activeId}`);
+      toast('Conversation deleted');
+      navigate('/inbox');
+      loadList();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
+
   const slash = text.startsWith('/') ? text.slice(1).toLowerCase() : null;
   const slashMatches = useMemo(
     () => (slash == null ? [] : templates.filter((t) => (t.shortcut || '').toLowerCase().startsWith(slash) || t.name.toLowerCase().includes(slash)).slice(0, 6)),
@@ -528,7 +601,7 @@ export default function Inbox() {
                       <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200/60 dark:bg-ink-800 dark:text-slate-300 dark:ring-ink-700">{m.divider}</span>
                     </div>
                   ) : (
-                    <MessageBubble key={m.id} m={m} isGroup={Boolean(conv?.is_group)} />
+                    <MessageBubble key={m.id} m={m} isGroup={Boolean(conv?.is_group)} onDelete={deleteMessage} />
                   ),
                 )
               )}
@@ -599,7 +672,14 @@ export default function Inbox() {
       {activeId && conv && showDetails && (
         <div className="fixed inset-0 z-30 flex justify-end bg-slate-950/40 xl:static xl:z-auto xl:bg-transparent" onClick={(e) => e.target === e.currentTarget && setShowDetails(false)}>
           <div className="h-full w-[min(360px,90vw)] xl:w-80">
-            <DetailsPanel conv={conv} users={users} onChange={update} onClose={() => setShowDetails(false)} />
+            <DetailsPanel
+              conv={conv}
+              users={users}
+              onChange={update}
+              onClose={() => setShowDetails(false)}
+              onClearMessages={clearMessages}
+              onDeleteConversation={deleteConversation}
+            />
           </div>
         </div>
       )}

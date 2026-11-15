@@ -178,4 +178,42 @@ r.post('/new', (req, res) => {
   res.json({ conversation: conversationView(conv.id) });
 });
 
+// Clear all chat history for a conversation
+r.delete('/:id/messages', (req, res) => {
+  const conv = get('SELECT * FROM conversations WHERE id = ?', req.params.id);
+  if (!conv) throw bad('Conversation not found.', 404);
+  run('DELETE FROM messages WHERE conversation_id = ?', conv.id);
+  run("UPDATE conversations SET last_message = '', last_direction = NULL, last_at = NULL, unread = 0 WHERE id = ?", conv.id);
+  const view = conversationView(conv.id);
+  broadcast('conversation', view);
+  res.json({ ok: true, conversation: view });
+});
+
+// Delete an individual message
+r.delete('/:id/messages/:msgId', (req, res) => {
+  const conv = get('SELECT * FROM conversations WHERE id = ?', req.params.id);
+  if (!conv) throw bad('Conversation not found.', 404);
+  run('DELETE FROM messages WHERE id = ? AND conversation_id = ?', req.params.msgId, conv.id);
+  const last = get('SELECT body, direction, created_at FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1', conv.id);
+  if (last) {
+    run('UPDATE conversations SET last_message = ?, last_direction = ?, last_at = ? WHERE id = ?', last.body, last.direction, last.created_at, conv.id);
+  } else {
+    run("UPDATE conversations SET last_message = '', last_direction = NULL, last_at = NULL WHERE id = ?", conv.id);
+  }
+  const view = conversationView(conv.id);
+  broadcast('conversation', view);
+  res.json({ ok: true, conversation: view });
+});
+
+// Delete an entire conversation
+r.delete('/:id', (req, res) => {
+  const conv = get('SELECT * FROM conversations WHERE id = ?', req.params.id);
+  if (!conv) throw bad('Conversation not found.', 404);
+  run('DELETE FROM messages WHERE conversation_id = ?', conv.id);
+  run('DELETE FROM notes WHERE conversation_id = ?', conv.id);
+  run('DELETE FROM conversations WHERE id = ?', conv.id);
+  broadcast('conversation.deleted', { id: conv.id });
+  res.json({ ok: true });
+});
+
 export default r;
