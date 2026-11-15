@@ -77,7 +77,7 @@ function RuleModal({ rule, numbers, onClose, onSaved }) {
           {f.replyType === 'text' ? (
             <Textarea value={f.replyBody} onChange={(e) => setF({ ...f, replyBody: e.target.value })} className="mt-3 min-h-28" placeholder={'Hi {{first_name}}! Our price list: …'} />
           ) : (
-            <p className="mt-3 rounded-xl bg-violet-50 p-3 text-sm text-violet-800 dark:bg-violet-500/10 dark:text-violet-200">Claude writes the reply using your persona and knowledge base (AI assistant tab).</p>
+            <p className="mt-3 rounded-xl bg-violet-50 p-3 text-sm text-violet-800 dark:bg-violet-500/10 dark:text-violet-200">The AI writes the reply using your persona and knowledge base (AI assistant tab).</p>
           )}
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -162,8 +162,19 @@ function AiTab() {
   const runTest = async () => {
     setTesting(true);
     setReply('');
+    const provider = ai.provider || (ai.apiKey?.startsWith('AIza') || ai.model?.startsWith('gemini') ? 'gemini' : 'anthropic');
     try {
-      const out = await api.post('/api/ai/test', { text: test, overrides: { persona: ai.persona, knowledge: ai.knowledge, model: ai.model, effort: ai.effort } });
+      const out = await api.post('/api/ai/test', {
+        text: test,
+        overrides: {
+          provider,
+          apiKey: ai.apiKey,
+          persona: ai.persona,
+          knowledge: ai.knowledge,
+          model: ai.model,
+          effort: ai.effort,
+        },
+      });
       setReply(out.reply);
     } catch (e) {
       setReply(`⚠️ ${e.message}`);
@@ -171,23 +182,97 @@ function AiTab() {
       setTesting(false);
     }
   };
+
+  const provider = ai.provider || (ai.apiKey?.startsWith('AIza') || ai.model?.startsWith('gemini') ? 'gemini' : 'anthropic');
+
+  const handleProviderChange = (newProvider) => {
+    setAi({
+      ...ai,
+      provider: newProvider,
+      model: newProvider === 'gemini' ? 'gemini-2.5-flash' : 'claude-sonnet-5-5',
+    });
+  };
+
+  const handleKeyChange = (val) => {
+    let nextProvider = provider;
+    let nextModel = ai.model;
+    if (val.startsWith('AIza')) {
+      nextProvider = 'gemini';
+      if (!nextModel?.startsWith('gemini')) nextModel = 'gemini-2.5-flash';
+    } else if (val.startsWith('sk-ant-')) {
+      nextProvider = 'anthropic';
+      if (!nextModel?.startsWith('claude')) nextModel = 'claude-sonnet-5-5';
+    }
+    setAi({ ...ai, apiKey: val, provider: nextProvider, model: nextModel });
+  };
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <Card>
-        <CardHeader title="AI assistant (Claude)" description="Answers customers when no rule matches, using your knowledge base." icon={Sparkles}
-          action={<Toggle checked={ai.enabled} onChange={(v) => setAi({ ...ai, enabled: v })} />} />
+        <CardHeader
+          title={`AI assistant (${provider === 'gemini' ? 'Google Gemini' : 'Claude'})`}
+          description="Answers customers automatically when no keyword rule matches, using your knowledge base."
+          icon={Sparkles}
+          action={<Toggle checked={ai.enabled} onChange={(v) => setAi({ ...ai, enabled: v })} />}
+        />
         <div className="space-y-5 p-5">
-          <Field label="Anthropic API key" hint={ai.apiKeyFromEnv ? 'Using ANTHROPIC_API_KEY from the server .env file.' : 'Get one at console.anthropic.com → API keys. Stored only in your local database.'}>
-            <Input type="password" value={ai.apiKey} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} placeholder={ai.apiKeySet ? 'Saved — type to replace' : 'sk-ant-…'} disabled={user?.role !== 'admin'} />
-          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Model">
-              <Select value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })}>
-                <option value="claude-opus-5-5">Claude Opus 5.5 (best quality)</option>
-                <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (fast, lower cost)</option>
-                <option value="claude-haiku-5-5">Claude Haiku 5.5 (fastest, cheapest)</option>
+            <Field label="AI Provider">
+              <Select value={provider} onChange={(e) => handleProviderChange(e.target.value)}>
+                <option value="gemini">Google Gemini (Free — Google AI Studio)</option>
+                <option value="anthropic">Anthropic Claude (Paid API key)</option>
               </Select>
             </Field>
+            <Field label="Model">
+              {provider === 'gemini' ? (
+                <Select value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })}>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended — Free & Smart)</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Fast & Free)</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Next-Gen & Free)</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning & Free)</option>
+                </Select>
+              ) : (
+                <Select value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })}>
+                  <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (Fast, balanced)</option>
+                  <option value="claude-haiku-5-5">Claude Haiku 5.5 (Fastest, cheapest)</option>
+                  <option value="claude-opus-5-5">Claude Opus 5.5 (Best quality)</option>
+                </Select>
+              )}
+            </Field>
+          </div>
+
+          <Field
+            label={provider === 'gemini' ? 'Google Gemini API key' : 'Anthropic API key'}
+            hint={
+              provider === 'gemini' ? (
+                <span>
+                  Get a 100% free API key from{' '}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-brand-600 underline dark:text-brand-400"
+                  >
+                    aistudio.google.com
+                  </a>{' '}
+                  (no credit card required).
+                </span>
+              ) : ai.apiKeyFromEnv ? (
+                'Using ANTHROPIC_API_KEY from server environment.'
+              ) : (
+                'Get one at console.anthropic.com → API keys. Stored only in your local database.'
+              )
+            }
+          >
+            <Input
+              type="password"
+              value={ai.apiKey}
+              onChange={(e) => handleKeyChange(e.target.value)}
+              placeholder={ai.apiKeySet ? 'Saved — type to replace' : provider === 'gemini' ? 'AIzaSy…' : 'sk-ant-…'}
+              disabled={user?.role !== 'admin'}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Thinking effort" hint="Low is right for chat replies.">
               <Select value={ai.effort} onChange={(e) => setAi({ ...ai, effort: e.target.value })}>
                 <option value="low">Low (fast)</option>
@@ -217,7 +302,7 @@ function AiTab() {
           </div>
         </Card>
         <Callout tone="brand" icon={ShieldCheck}>
-          The AI never runs in group chats, stops when a team member replies (human takeover), and refusals fall back automatically to another Claude model so customers are not left without an answer.
+          The AI never runs in group chats, stops when a team member replies (human takeover), and answers safely based on your knowledge base.
         </Callout>
       </div>
     </div>

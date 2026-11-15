@@ -26,8 +26,8 @@ settings.get('/', (req, res) => {
     }
     out[section] = s;
   }
-  out.ai.apiKeySet ||= Boolean(config.anthropicKey);
-  out.ai.apiKeyFromEnv = !getSettings('ai').apiKey && Boolean(config.anthropicKey);
+  out.ai.apiKeySet ||= Boolean(config.anthropicKey || config.geminiKey);
+  out.ai.apiKeyFromEnv = !getSettings('ai').apiKey && Boolean(config.anthropicKey || config.geminiKey);
   const mc = metaConfig();
   out.meta.webhookUrl = `${config.publicUrl}/hooks/meta`;
   out.meta.verifyTokenSet = Boolean(mc.verifyToken);

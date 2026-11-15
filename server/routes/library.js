@@ -128,7 +128,7 @@ ai.post('/test', async (req, res) => {
   const text = String(req.body?.text || '').trim();
   if (!text) throw bad('Type a customer message to test.');
   const overrides = {};
-  for (const k of ['persona', 'knowledge', 'model', 'effort']) {
+  for (const k of ['provider', 'apiKey', 'persona', 'knowledge', 'model', 'effort']) {
     if (req.body?.overrides?.[k]) overrides[k] = req.body.overrides[k];
   }
   const reply = await generateReply({ messages: [{ role: 'user', content: text }], overrides });

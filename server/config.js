@@ -64,6 +64,7 @@ export const config = {
   // Address the OpenWA engine uses to reach WaBridge's webhook receiver.
   publicUrl: env('WABRIDGE_PUBLIC_URL', `http://localhost:${port}`).replace(/\/+$/, ''),
   anthropicKey: env('ANTHROPIC_API_KEY'),
+  geminiKey: env('GEMINI_API_KEY'),
   cookieSecure: env('COOKIE_SECURE', process.env.VERCEL === '1' ? 'true' : 'false') === 'true',
   meta: {
     phoneNumberId: env('META_PHONE_NUMBER_ID'),

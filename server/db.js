@@ -282,8 +282,9 @@ export const DEFAULT_SETTINGS = {
   },
   ai: {
     enabled: false,
+    provider: 'gemini',
     apiKey: '',
-    model: 'claude-opus-5-5',
+    model: 'gemini-2.5-flash',
     effort: 'low',
     persona:
       'You are a friendly, concise customer-support assistant for our business on WhatsApp. Reply in the same language the customer uses (English, Hindi or Hinglish). Keep replies short (1-4 sentences). If you do not know something, say a team member will follow up.',
